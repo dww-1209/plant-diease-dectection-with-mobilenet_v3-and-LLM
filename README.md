@@ -1,0 +1,2 @@
+# plant-diease-dectection-with-mobilenet_v3-and-LLM
+根据百度2018年AI竞赛提供的数万张植物疾病农作物病害图像进行分类，采用轻量的mobile_net_v3作为迁移学习的对象，在此基础上训练并优化模型，最后结合调用大语言模型的api从而进行简单的网页部署.对植物的疾病监测及预防，诊断起到帮助
