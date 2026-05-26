@@ -19,8 +19,10 @@ class _StubProvider(LLMService):
 
 def test_template_has_all_placeholders():
     rendered = TREATMENT_PROMPT_TEMPLATE.format(
-        plant_class="番茄", disease_name="早疫病",
-        disease_degree="一般", health_status="患病",
+        plant_class="番茄",
+        disease_name="早疫病",
+        disease_degree="一般",
+        health_status="患病",
     )
     assert "番茄" in rendered and "早疫病" in rendered
 

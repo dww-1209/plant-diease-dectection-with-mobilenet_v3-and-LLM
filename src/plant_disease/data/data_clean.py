@@ -17,7 +17,7 @@ def load_files(file_path):
     """
     filename_lists = list()
     filepath_dicts = dict()
-    for directory, folder, filenames in os.walk(file_path):
+    for directory, _folder, filenames in os.walk(file_path):
         for filename in tqdm(filenames):
             if os.path.splitext(filename)[-1] not in [".jpg", ".JPG", ".JPEG", ".jpeg", ".png"]:
                 continue
@@ -128,6 +128,7 @@ def process_repeat(train_file_path, val_file_path):
 
 if __name__ == "__main__":
     import argparse
+
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", required=True)

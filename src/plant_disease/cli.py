@@ -6,13 +6,17 @@ import argparse
 import logging
 import os
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from dotenv import load_dotenv
 
 
 def _setup_logging() -> None:
-    level = logging.DEBUG if os.environ.get("PLANT_DISEASE_DEBUG", "").lower() in {"1", "true"} else logging.INFO
+    level = (
+        logging.DEBUG
+        if os.environ.get("PLANT_DISEASE_DEBUG", "").lower() in {"1", "true"}
+        else logging.INFO
+    )
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -42,7 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("serve", help="Start the Flask web server")
 
     t = sub.add_parser("train", help="Train MobileNetV2 on the dataset")
-    t.add_argument("--data-dir", default="input", help="Dataset root (expects train/ and val/ subdirs)")
+    t.add_argument(
+        "--data-dir", default="input", help="Dataset root (expects train/ and val/ subdirs)"
+    )
     t.add_argument("--epochs", type=int, default=20)
     t.add_argument("--batch-size", type=int, default=64)
     t.add_argument("--lr", type=float, default=1e-4)

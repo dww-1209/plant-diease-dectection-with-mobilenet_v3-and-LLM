@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ClassifyAsLabel:
     @staticmethod
     def read_json(json_path: str) -> list[dict]:
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.loads(f.read())
         logger.info("loaded %d annotations from %s", len(data), json_path)
         return data

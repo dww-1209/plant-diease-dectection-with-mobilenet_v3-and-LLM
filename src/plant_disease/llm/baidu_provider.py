@@ -13,9 +13,7 @@ from plant_disease.llm.base import LLMService
 logger = logging.getLogger(__name__)
 
 TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token"
-CHAT_URL = (
-    "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions"
-)
+CHAT_URL = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions"
 
 
 class BaiduWenxinProvider(LLMService):

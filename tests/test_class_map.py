@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from plant_disease.data.class_map import (
     CLASS_DICTS,
     ClassInfo,
@@ -20,7 +18,9 @@ def test_load_class_map_basic(tmp_path):
     p = _write_txt(tmp_path, "0 0 0 0 0\n1 0 1 1 1\n")
     rows = load_class_map(p)
     assert len(rows) == 2
-    assert rows[0] == ClassInfo(plant="苹果", health_status="未患病", disease_degree="健康", disease_name="健康")
+    assert rows[0] == ClassInfo(
+        plant="苹果", health_status="未患病", disease_degree="健康", disease_name="健康"
+    )
     assert rows[1].plant == "苹果"
     assert rows[1].disease_name == "苹果黑星病"
 

@@ -11,20 +11,23 @@ from plant_disease.errors import LLMServiceError
 
 logger = logging.getLogger(__name__)
 
-TREATMENT_PROMPT_TEMPLATE = """你是一位专业的植物病理学专家。请根据以下信息，提供详细的植物病害治理建议：
-
-植物种类：{plant_class}
-病害名称：{disease_name}
-患病程度：{disease_degree}
-健康状况：{health_status}
-
-请提供：
-1. 病害的简要说明
-2. 具体的治理措施（包括化学防治、生物防治、农业防治等）
-3. 预防措施
-4. 注意事项
-
-请用中文回答，内容要专业、实用、易懂。"""
+TREATMENT_PROMPT_TEMPLATE = (
+    "你是一位专业的植物病理学专家。"
+    "请根据以下信息，提供详细的植物病害治理建议：\n"
+    "\n"
+    "植物种类：{plant_class}\n"
+    "病害名称：{disease_name}\n"
+    "患病程度：{disease_degree}\n"
+    "健康状况：{health_status}\n"
+    "\n"
+    "请提供：\n"
+    "1. 病害的简要说明\n"
+    "2. 具体的治理措施（包括化学防治、生物防治、农业防治等）\n"
+    "3. 预防措施\n"
+    "4. 注意事项\n"
+    "\n"
+    "请用中文回答，内容要专业、实用、易懂。"
+)
 
 DEFAULT_TIMEOUT = 30
 

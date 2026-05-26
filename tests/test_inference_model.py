@@ -1,5 +1,4 @@
 from io import BytesIO
-from pathlib import Path
 
 import pytest
 import torch
@@ -31,9 +30,12 @@ def patched_model(monkeypatch, tmp_path):
 def test_predict_returns_expected_keys(patched_model):
     out = patched_model.predict(_png_bytes())
     assert set(out.keys()) == {
-        "class_id", "probability",
-        "plant_class", "health_status",
-        "disease_name", "disease_degree",
+        "class_id",
+        "probability",
+        "plant_class",
+        "health_status",
+        "disease_name",
+        "disease_degree",
     }
     assert isinstance(out["class_id"], int)
     assert 0.0 <= out["probability"] <= 1.0
@@ -69,4 +71,6 @@ def test_missing_weights_path_raises_inference_error(tmp_path, monkeypatch):
         lambda _p: [],
     )
     with pytest.raises(errors.InferenceError):
-        InferenceModel(weights_path=tmp_path / "does-not-exist.pth", classes_txt=tmp_path / "classes.txt")
+        InferenceModel(
+            weights_path=tmp_path / "does-not-exist.pth", classes_txt=tmp_path / "classes.txt"
+        )

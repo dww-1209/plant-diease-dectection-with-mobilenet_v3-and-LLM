@@ -27,6 +27,7 @@ def get_llm_service(provider: str) -> LLMService:
         if not key:
             raise LLMConfigError("缺少环境变量 OPENAI_API_KEY")
         from plant_disease.llm.openai_provider import OpenAIProvider
+
         return OpenAIProvider(api_key=key)
 
     if name == "baidu":
@@ -35,6 +36,7 @@ def get_llm_service(provider: str) -> LLMService:
         if not api_key or not secret:
             raise LLMConfigError("缺少环境变量 BAIDU_API_KEY 或 BAIDU_SECRET_KEY")
         from plant_disease.llm.baidu_provider import BaiduWenxinProvider
+
         return BaiduWenxinProvider(api_key=api_key, secret_key=secret)
 
     # alibaba
@@ -42,4 +44,5 @@ def get_llm_service(provider: str) -> LLMService:
     if not key:
         raise LLMConfigError("缺少环境变量 DASHSCOPE_API_KEY")
     from plant_disease.llm.alibaba_provider import AlibabaTongyiProvider
+
     return AlibabaTongyiProvider(api_key=key)

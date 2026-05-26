@@ -22,7 +22,9 @@ NORM_STD = [0.229, 0.224, 0.225]
 UNFREEZE_RATIO = 0.30
 
 
-def build_dataloaders(data_dir: Path, batch_size: int, num_workers: int = 4) -> tuple[DataLoader, DataLoader, list[str]]:
+def build_dataloaders(
+    data_dir: Path, batch_size: int, num_workers: int = 4
+) -> tuple[DataLoader, DataLoader, list[str]]:
     train_tf = transforms.Compose(
         [
             transforms.RandomRotation(20),
@@ -44,7 +46,9 @@ def build_dataloaders(data_dir: Path, batch_size: int, num_workers: int = 4) -> 
     )
     train_ds = datasets.ImageFolder(str(data_dir / "train"), transform=train_tf)
     val_ds = datasets.ImageFolder(str(data_dir / "val"), transform=val_tf)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers
+    )
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_loader, val_loader, train_ds.classes
 
@@ -129,7 +133,10 @@ def plot_history(train_losses, train_accs, val_losses, val_accs, out_dir: Path) 
         logger.warning("matplotlib 未安装，跳过绘图")
         return
     out_dir.mkdir(parents=True, exist_ok=True)
-    for name, train_m, val_m in [("loss", train_losses, val_losses), ("accuracy", train_accs, val_accs)]:
+    for name, train_m, val_m in [
+        ("loss", train_losses, val_losses),
+        ("accuracy", train_accs, val_accs),
+    ]:
         plt.figure(figsize=(6, 4))
         plt.plot(range(1, len(train_m) + 1), train_m, label=f"train {name}")
         plt.plot(range(1, len(val_m) + 1), val_m, label=f"val {name}")
@@ -169,7 +176,12 @@ def main(args: argparse.Namespace) -> int:
         val_accs.append(va)
         logger.info(
             "epoch %d/%d  train_loss=%.4f acc=%.2f%%  val_loss=%.4f acc=%.2f%%",
-            epoch + 1, args.epochs, tl, ta, vl, va,
+            epoch + 1,
+            args.epochs,
+            tl,
+            ta,
+            vl,
+            va,
         )
 
         if vl < best_val_loss:

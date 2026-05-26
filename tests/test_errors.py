@@ -1,8 +1,8 @@
 from plant_disease.errors import (
-    PlantDiseaseError,
     InferenceError,
-    LLMServiceError,
     LLMConfigError,
+    LLMServiceError,
+    PlantDiseaseError,
 )
 
 

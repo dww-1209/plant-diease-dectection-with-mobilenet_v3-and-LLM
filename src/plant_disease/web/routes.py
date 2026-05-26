@@ -5,7 +5,15 @@ from __future__ import annotations
 import logging
 import os
 
-from flask import Blueprint, Flask, current_app, jsonify, render_template, request, send_from_directory
+from flask import (
+    Blueprint,
+    Flask,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+)
 
 from plant_disease.errors import InferenceError, LLMConfigError, LLMServiceError
 from plant_disease.llm.factory import get_llm_service
@@ -67,7 +75,10 @@ def get_treatment_advice():
     health_status = data.get("health_status", "")
 
     if not plant_class or not disease_name:
-        return jsonify({"success": False, "message": "缺少必要参数 plant_class 或 disease_name"}), 400
+        return (
+            jsonify({"success": False, "message": "缺少必要参数 plant_class 或 disease_name"}),
+            400,
+        )
 
     settings = current_app.config["SETTINGS"]
     provider_name = (data.get("provider") or settings.llm_provider or "mock").strip().lower()

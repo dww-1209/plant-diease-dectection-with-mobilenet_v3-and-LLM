@@ -44,7 +44,9 @@ def test_load_settings_overrides(monkeypatch):
     assert s.weights_path == Path("/tmp/w.pth")
 
 
-@pytest.mark.parametrize("value,expected", [("0", False), ("false", False), ("1", True), ("true", True), ("True", True)])
+@pytest.mark.parametrize(
+    "value,expected", [("0", False), ("false", False), ("1", True), ("true", True), ("True", True)]
+)
 def test_flask_debug_parsing(monkeypatch, value, expected):
     monkeypatch.setenv("FLASK_DEBUG", value)
     assert load_settings().flask_debug is expected

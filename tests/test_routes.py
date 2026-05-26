@@ -45,8 +45,10 @@ def test_get_treatment_advice_invalid_provider(client):
     resp = client.post(
         "/get_treatment_advice",
         json={
-            "plant_class": "a", "disease_name": "b",
-            "disease_degree": "c", "health_status": "d",
+            "plant_class": "a",
+            "disease_name": "b",
+            "disease_degree": "c",
+            "health_status": "d",
             "provider": "no-such",
         },
     )
