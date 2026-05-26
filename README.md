@@ -14,128 +14,89 @@ flowchart LR
     Flask -- "JSON" --> User
 ```
 
-## 快速开始
+## 三个入口脚本
+
+项目根目录下有三个入口脚本，对应三个使用阶段。**按顺序运行即可**：
+
+| 脚本 | 作用 | 何时跑 |
+|---|---|---|
+| `prepare_dataset.py` | 把扁平的百度数据集归类成 `ImageFolder` 结构，并清洗 | 拿到数据后第一步 |
+| `train_model.py` | 训练 MobileNetV2，产出权重文件 | 数据准备好之后 |
+| `run_web.py` | 启动 Flask Web 服务（上传图片 → 识别 → LLM 给建议） | 有了权重之后；或者只想看 Web 长啥样 |
+
+每个脚本都可以直接 `python xxx.py` 跑，加 `--help` 看可选参数。
+
+## 端到端流程
+
+### 0. 准备环境（一次性）
 
 ```bash
 git clone <your-repo>
 cd plant-disease-detection
-cp .env.example .env       # 按需填写 API Key
-uv sync --all-extras       # 安装依赖（含训练 + 开发工具）
-uv run plant-disease serve # http://localhost:5000
+uv sync --all-extras            # 装依赖（含训练 + 开发工具）
+cp .env.example .env            # 不填 key 也行，默认 LLM_PROVIDER=mock
 ```
 
-> 推理需要权重文件 `resources/mobilenetv2_best.pth`（不入仓库）。无权重时 Web 可启动，但 `/predict` 会返回 503。
+### 1. 把数据集放到项目根目录
 
-## CLI 总览
+从 [百度 PDR2018](https://challenger.ai/competition/pdr2018) 下载并解压，确保**项目根目录下**有这两个文件夹（名字保持原样）：
 
-**所有功能都通过 `plant-disease` 一个命令的子命令调用，不要直接 `python xxx.py`。**
+```
+plant-disease-detection/
+├── AgriculturalDisease_trainingset/
+│   ├── images/                                           # 31718 张 *.jpg
+│   └── AgriculturalDisease_train_annotations.json
+├── AgriculturalDisease_validationset/
+│   ├── images/                                           # 4540 张 *.jpg
+│   └── AgriculturalDisease_validation_annotations.json
+├── prepare_dataset.py
+├── train_model.py
+└── run_web.py
+```
 
-| 子命令 | 何时用 | 关键参数 |
-|---|---|---|
-| `prepare-data` | 把百度原始扁平数据集按类别整理成 `ImageFolder` 结构 | `--images`、`--annotations`、`--out`、`--mode {copy,move}` |
-| `clean-data` | 去重 + 删除 train/val 重叠（**破坏性**） | `--train`、`--val` |
-| `train` | 训练 MobileNetV2 | `--data-dir`、`--epochs`、`--batch-size`、`--lr`、`--patience`、`--ckpt-out` |
-| `serve` | 启动 Flask Web 服务 | 通过环境变量配置 `HOST` / `PORT` / `FLASK_DEBUG` |
-
-任意子命令都可以加 `--help` 查看完整参数：
+### 2. 数据预处理
 
 ```bash
-plant-disease --help
-plant-disease prepare-data --help
-plant-disease train --help
+uv run python prepare_dataset.py
 ```
 
-## 端到端流程
+默认行为：① 复制图片到 `input/train/<class_id>/` 与 `input/val/<class_id>/`，② 自动清洗（去重 + 删除 train/val 重叠）。
 
-下面是从「刚下完百度数据集」到「Web 能识别 + 给建议」的完整顺序，按部就班执行即可。
-
-```
-prepare-data (train)
-    ↓
-prepare-data (val)
-    ↓
-clean-data        ← 可选
-    ↓
-train
-    ↓
-serve
-```
-
-### 步骤 1：准备环境（一次性）
+可选参数：
 
 ```bash
-uv sync --all-extras
-cp .env.example .env       # 不填 key 也行，默认 LLM_PROVIDER=mock
+uv run python prepare_dataset.py --no-clean   # 只归类，不清洗
+uv run python prepare_dataset.py --move       # 用移动而非复制（节省磁盘但破坏性）
 ```
 
-### 步骤 2：归类训练集和验证集
-
-假设数据集解压在 `~/Downloads/baidu_pdr2018/`：
+### 3. 训练
 
 ```bash
-plant-disease prepare-data \
-    --images      ~/Downloads/baidu_pdr2018/AgriculturalDisease_trainingset/images \
-    --annotations ~/Downloads/baidu_pdr2018/AgriculturalDisease_trainingset/AgriculturalDisease_train_annotations.json \
-    --out         input/train \
-    --mode        copy
-
-plant-disease prepare-data \
-    --images      ~/Downloads/baidu_pdr2018/AgriculturalDisease_validationset/images \
-    --annotations ~/Downloads/baidu_pdr2018/AgriculturalDisease_validationset/AgriculturalDisease_validation_annotations.json \
-    --out         input/val \
-    --mode        copy
+uv run python train_model.py
 ```
 
-跑完后 `input/{train,val}/0..60/*.jpg` 齐全。`--mode copy` 默认保留原始数据；磁盘紧张可改 `--mode move`。
+默认 20 epoch、batch_size 64、AdamW、lr 1e-4，用 `cuda` → `mps` → `cpu` 自动选设备。产物：
 
-### 步骤 3：清洗（可选）
+- `resources/mobilenetv2_best.pth` — 验证集最佳权重（直接给 `run_web.py` 用）
+- `artifacts/loss.png` / `artifacts/accuracy.png` — 训练曲线
+
+CPU/小显存常用调整：
 
 ```bash
-plant-disease clean-data --train input/train --val input/val
+uv run python train_model.py --epochs 5 --batch-size 16
 ```
 
-只在步骤 2 用了 `--mode copy` 时再跑，方便回滚。
-
-### 步骤 4：训练
+### 4. 启动 Web
 
 ```bash
-plant-disease train --data-dir input --epochs 20 --batch-size 64
-```
-
-产物：`mobilenetv2_best.pth`、`artifacts/loss.png`、`artifacts/accuracy.png`。
-
-### 步骤 5：启动 Web
-
-把权重移到默认位置后启动：
-
-```bash
-mv mobilenetv2_best.pth resources/mobilenetv2_best.pth
-plant-disease serve
+uv run python run_web.py
 ```
 
 打开 [http://localhost:5000](http://localhost:5000) → 上传图片 → 点「获取治理建议」。
 
-## 数据集说明
+> 不想训练只想看页面长啥样？直接跳到第 4 步即可。无权重时 `/predict` 会返回 503，但首页 / 关于页 / `/get_treatment_advice` 都能正常用。
 
-百度官方数据集刚下载下来是「扁平图像 + JSON 标注」结构：
-
-```
-AgriculturalDisease_trainingset/
-├── images/*.jpg                                       # 31718 张（无类别目录）
-└── AgriculturalDisease_train_annotations.json        # image_id → disease_class
-
-AgriculturalDisease_validationset/
-├── images/*.jpg
-└── AgriculturalDisease_validation_annotations.json
-```
-
-而本项目训练用的是 `torchvision.datasets.ImageFolder`，需要 `train/<class_id>/*.jpg` 这种按类目分文件夹的结构。所以必须先经过 `prepare-data` 归类（见上面的端到端流程）。
-
-清洗逻辑（`clean-data`）做两件事：
-- 删除文件名带「副本」的重复图片（人工拷贝痕迹）
-- 删除 train 与 val 出现的同名图片，避免数据泄漏
-
-## HTTP 路由
+## HTTP 路由（`run_web.py`）
 
 | 路由 | 方法 | 说明 |
 |---|---|---|
@@ -145,44 +106,53 @@ AgriculturalDisease_validationset/
 | `/predict` | POST | `multipart/form-data`，字段 `image` |
 | `/get_treatment_advice` | POST | JSON `{plant_class, disease_name, disease_degree, health_status, provider?}` |
 
-`serve` 默认绑定 `127.0.0.1:5000`，通过 `HOST` / `PORT` / `FLASK_DEBUG` 环境变量调整。
+默认绑定 `127.0.0.1:5000`，通过 `.env` 里的 `HOST` / `PORT` / `FLASK_DEBUG` 调整。
 
 ## LLM 配置
 
+在 `.env` 文件里配置：
+
 | Provider | 必需环境变量 |
 |---|---|
-| `mock` | 无（用于离线测试） |
+| `mock` | 无（默认值；用于离线测试） |
 | `openai` | `OPENAI_API_KEY` |
 | `baidu` | `BAIDU_API_KEY`、`BAIDU_SECRET_KEY` |
 | `alibaba`（推荐） | `DASHSCOPE_API_KEY` |
 
-通过 `LLM_PROVIDER` 默认值选择，单次请求可在 body 里覆盖 `provider`。
+通过 `LLM_PROVIDER` 默认值选择，单次请求可在 body 里覆盖 `provider` 字段。
 
 ## 项目结构
 
 ```
-src/plant_disease/
-├── cli.py            # plant-disease 入口；serve / train / prepare-data / clean-data
-├── config.py         # Settings（统一读环境变量）
-├── errors.py         # 自定义异常
-├── model.py          # InferenceModel (MobileNetV2)
-├── data/             # class_map / dataset_classifier / data_clean
-├── llm/              # base + mock / openai / baidu / alibaba + factory
-├── training/train.py # 训练流程
-└── web/
-    ├── app.py        # Flask app factory
-    ├── routes.py     # 路由
-    ├── templates/    # 前端 HTML
-    └── static/       # CSS / JS
-tests/                # pytest
-resources/            # actual_classed_v2.txt + (.pth 不入仓库)
+plant-disease-detection/
+├── prepare_dataset.py        # 入口①：数据归类 + 清洗
+├── train_model.py            # 入口②：训练
+├── run_web.py                # 入口③：Web 服务
+├── pyproject.toml            # uv / 依赖 / 工具链
+├── .env.example              # 环境变量样例
+├── resources/
+│   ├── actual_classed_v2.txt # 类别映射表
+│   └── mobilenetv2_best.pth  # 训练后的权重（不入仓库）
+├── src/plant_disease/        # 实现细节
+│   ├── config.py             # Settings（统一读环境变量）
+│   ├── errors.py             # 自定义异常
+│   ├── model.py              # InferenceModel
+│   ├── data/                 # class_map / dataset_classifier / data_clean
+│   ├── llm/                  # base + mock / openai / baidu / alibaba + factory
+│   ├── training/train.py     # 训练流程
+│   └── web/
+│       ├── app.py            # Flask app factory
+│       ├── routes.py         # 路由
+│       ├── templates/        # 前端 HTML
+│       └── static/           # CSS / JS
+└── tests/                    # pytest
 ```
 
 ## 开发
 
 ```bash
 uv sync --all-extras
-uv run pytest                # 跑全部测试
+uv run pytest                # 跑全部测试（约 1 秒、47 项）
 uv run ruff check .          # lint
 uv run black .               # 格式化
 ```
@@ -190,13 +160,16 @@ uv run black .               # 格式化
 ## 常见问题
 
 **Q：没有 `.pth` 权重怎么办？**
-A：Web 仍可启动，识别接口会返回 503；可先用 `mock` provider 体验 LLM 接口，等训练或拷贝权重后再使用完整功能。
+A：跳过步骤 2、3，直接跑 `run_web.py`。Web 能起来，识别接口会返回 503，但 LLM 建议接口（`mock` provider）能正常用。
 
 **Q：为什么是 MobileNetV2 而不是仓库名所写的 V3？**
 A：原仓库代码实际就是 V2，本次重构选择对齐到代码现状，避免误导。后续若升级 V3 是独立 PR。
 
 **Q：Mac 没有 CUDA 能跑吗？**
-A：能。`InferenceModel` 自动选择 `cuda → mps → cpu`。
+A：能。设备自动选择 `cuda → mps → cpu`，训练和推理都适配。
+
+**Q：CPU 训练巨慢怎么办？**
+A：先用 `--epochs 1 --batch-size 16` 跑通流程；要真训练建议借 Colab/Kaggle 的免费 GPU。
 
 ## License
 

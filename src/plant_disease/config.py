@@ -1,6 +1,8 @@
 """Centralized environment-driven settings.
 
-This is the only module (besides cli.py and training argparse) that reads os.environ.
+This is the only module that reads os.environ for the runtime application.
+The root-level entry scripts (run_web.py, train_model.py, prepare_dataset.py)
+read PLANT_DISEASE_DEBUG only for logging configuration.
 """
 
 from __future__ import annotations

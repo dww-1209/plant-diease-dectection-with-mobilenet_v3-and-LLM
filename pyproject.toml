@@ -27,9 +27,6 @@ dev = [
     "black>=23.0.0",
 ]
 
-[project.scripts]
-plant-disease = "plant_disease.cli:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
