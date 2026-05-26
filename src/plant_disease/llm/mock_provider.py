@@ -1,9 +1,16 @@
-"""Deterministic mock provider for tests and missing-key fallback."""
+"""离线测试 / 无 key 时的兜底 provider。
+
+直接返回固定模板文本，不发任何 HTTP 请求。两个用途：
+1. 跑测试时不依赖外部 API 与网络
+2. 用户没填任何 key 时，前端依然能看到一个合理的"建议"长什么样
+"""
 
 from plant_disease.llm.base import LLMService
 
 
 class MockProvider(LLMService):
+    """不调真实 API，只把模板里的字段插一插就返回。"""
+
     def get_treatment_advice(
         self,
         plant_class: str,
@@ -11,6 +18,7 @@ class MockProvider(LLMService):
         disease_degree: str,
         health_status: str,
     ) -> str:
+        """返回一段固定结构的中文建议（含 plant_class / disease_name 等字段值）。"""
         return f"""针对{plant_class}的{disease_name}（{disease_degree}），建议如下：
 
 1. 病害说明：

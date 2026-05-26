@@ -1,4 +1,4 @@
-"""Alibaba Tongyi Qianwen (DashScope) provider."""
+"""阿里通义千问（DashScope）provider，默认 ``qwen-turbo`` 模型。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ API_BASE = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/
 
 
 class AlibabaTongyiProvider(LLMService):
+    """通义 DashScope 原生协议（与 OpenAI 协议不同，单独实现）。"""
+
     def __init__(self, api_key: str, model: str = "qwen-turbo") -> None:
         super().__init__(api_key=api_key)
         self.model = model
@@ -25,12 +27,14 @@ class AlibabaTongyiProvider(LLMService):
         return API_BASE, headers, body
 
     def _extract_text(self, payload: dict[str, Any]) -> str:
-        # 标准格式优先
+        # DashScope 不同模型 / 不同接入方式响应字段会变，依次兜底：
+        # 1) result.output.choices[0].message.content（聊天模式标准）
+        # 2) result.output.text（旧版 / 部分模型）
+        # 3) result.text（极少见）
         try:
             return payload["output"]["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
             pass
-        # 备选格式
         text = payload.get("output", {}).get("text") or payload.get("text")
         if text:
             return text

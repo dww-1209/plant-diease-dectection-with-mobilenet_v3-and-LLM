@@ -1,4 +1,9 @@
-"""Class index → human-readable mapping for the 61-class taxonomy."""
+"""61 类索引 → 人类可读的中文标签的映射。
+
+百度数据集把 61 个细分类拆成 4 个语义维度：植物种类（10）× 是否健康（2）×
+病害程度（4）× 病害类型（28）。``actual_classed_v2.txt`` 给出每个 0..60 类
+ID 对应这 4 个维度上的索引；本模块负责加载与查询。
+"""
 
 from __future__ import annotations
 
@@ -63,6 +68,11 @@ CLASS_DICTS = {
 
 @dataclass(frozen=True)
 class ClassInfo:
+    """单个类别 ID 解码后的 4 维语义信息。
+
+    ``frozen=True`` 让实例不可改，避免运行时被无意中篡改影响其他调用。
+    """
+
     plant: str
     health_status: str
     disease_degree: str
@@ -70,11 +80,11 @@ class ClassInfo:
 
 
 def load_class_map(path: Path) -> list[ClassInfo]:
-    """Parse the 61-class mapping table.
+    """读取 61 类映射表，返回按 class_id 顺序排列的 ``ClassInfo`` 列表。
 
-    Each line: <class_id> <plant_idx> <healthy_idx> <degree_idx> <disease_idx>.
-    Returns rows ordered by class_id; malformed/missing rows are skipped.
-    Returns empty list when path doesn't exist.
+    每行格式：``<class_id> <plant_idx> <healthy_idx> <degree_idx> <disease_idx>``。
+    格式不对 / 字段不全的行**直接跳过**（不报错），文件不存在时返回空列表。
+    这样让 Web 即使在缺类别表的情况下也能起来（虽然返回的标签会是占位符）。
     """
     if not path.exists():
         logger.warning("class map not found: %s", path)
@@ -103,7 +113,11 @@ def load_class_map(path: Path) -> list[ClassInfo]:
 
 
 def lookup_class(rows: list[ClassInfo], idx: int) -> ClassInfo:
-    """Return ClassInfo for a class index, or a placeholder if out of range."""
+    """按索引取 ``ClassInfo``，越界时返回 ``"类别{idx}" + "未知"`` 占位。
+
+    返回占位（而非抛异常）是为了让模型推出冷门类时 UI 仍能正常显示，不至于
+    因为一个 ImageFolder 顺序错位就让整个 ``/predict`` 500。
+    """
     if 0 <= idx < len(rows):
         return rows[idx]
     return ClassInfo(

@@ -34,9 +34,20 @@ def classify_dataset(
     out_dir: Path,
     mode: Mode = "copy",
 ) -> dict[str, int]:
-    """Place each image under ``out_dir/<disease_class>/`` based on annotations.
+    """按 JSON 标注把每张图放到 ``out_dir/<disease_class>/`` 下。
 
-    Returns a summary dict: ``{"placed": int, "missing": int, "classes": int}``.
+    Args:
+        images_dir: 扁平图片目录（``AgriculturalDisease_xxxset/images``）
+        annotations: 对应的 ``*annotation*.json`` 文件
+        out_dir: 输出根目录，本函数会自动建子目录
+        mode: ``copy`` 保留原文件（默认，可重跑），``move`` 直接迁移
+
+    Returns:
+        ``{"placed": 已放置张数, "missing": 标注里有但图片缺失张数,
+           "classes": 实际见到的类别数}``
+
+    Raises:
+        ValueError: ``mode`` 不是 copy/move
     """
     if mode not in ("copy", "move"):
         raise ValueError(f"unknown mode: {mode!r} (expected 'copy' or 'move')")

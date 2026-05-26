@@ -1,4 +1,4 @@
-"""OpenAI Chat Completions provider (GPT-3.5/4)."""
+"""OpenAI Chat Completions provider（默认 ``gpt-3.5-turbo``）。"""
 
 from __future__ import annotations
 
@@ -12,6 +12,12 @@ SYSTEM_PROMPT = "你是一位专业的植物病理学专家，擅长提供植物
 
 
 class OpenAIProvider(LLMService):
+    """OpenAI Chat Completions API 调用。
+
+    与其他兼容 OpenAI 协议的服务（DeepSeek / 智谱 / 通义 OpenAI 兼容模式 …）
+    可以共用本实现，只要构造时把 ``API_BASE`` 改成对应 base_url 即可。
+    """
+
     def __init__(self, api_key: str, model: str = "gpt-3.5-turbo") -> None:
         super().__init__(api_key=api_key)
         self.model = model
