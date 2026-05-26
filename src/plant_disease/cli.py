@@ -40,6 +40,19 @@ def _cmd_train(args: argparse.Namespace) -> int:
     return train_module.main(args)
 
 
+def _cmd_prepare_data(args: argparse.Namespace) -> int:
+    from plant_disease.data.dataset_classifier import main as prepare_main
+
+    return prepare_main(args)
+
+
+def _cmd_clean_data(args: argparse.Namespace) -> int:
+    from plant_disease.data.data_clean import process_repeat
+
+    process_repeat(args.train, args.val)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="plant-disease")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -56,6 +69,31 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--patience", type=int, default=3)
     t.add_argument("--ckpt-out", default="mobilenetv2_best.pth")
 
+    p = sub.add_parser(
+        "prepare-data",
+        help="Place Baidu-2018 images into per-class subdirs based on the JSON annotations",
+    )
+    p.add_argument("--images", required=True, help="Directory with the flat *.jpg files")
+    p.add_argument(
+        "--annotations", required=True, help="JSON file mapping image_id → disease_class"
+    )
+    p.add_argument(
+        "--out", required=True, help="Output root; per-class subdirs are created here"
+    )
+    p.add_argument(
+        "--mode",
+        choices=["copy", "move"],
+        default="copy",
+        help="copy keeps originals (recommended); move is faster but destructive",
+    )
+
+    c = sub.add_parser(
+        "clean-data",
+        help="Drop images with '副本' duplicate names and remove train/val overlap",
+    )
+    c.add_argument("--train", required=True)
+    c.add_argument("--val", required=True)
+
     return parser
 
 
@@ -68,6 +106,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_serve(args)
     if args.cmd == "train":
         return _cmd_train(args)
+    if args.cmd == "prepare-data":
+        return _cmd_prepare_data(args)
+    if args.cmd == "clean-data":
+        return _cmd_clean_data(args)
     parser.print_help()
     return 2
 

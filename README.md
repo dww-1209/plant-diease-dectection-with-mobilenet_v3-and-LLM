@@ -28,18 +28,49 @@ uv run plant-disease serve # http://localhost:5000
 
 ## 数据准备
 
+百度官方数据集刚下载下来是「扁平图像 + JSON 标注」结构：
+
 ```
-input/
-├── train/<class_id>/*.jpg   # 0..60 共 61 个目录
-└── val/<class_id>/*.jpg
+AgriculturalDisease_trainingset/
+├── images/*.jpg                                       # 31718 张（无类别目录）
+└── AgriculturalDisease_train_annotations.json        # image_id → disease_class
+
+AgriculturalDisease_validationset/
+├── images/*.jpg
+└── AgriculturalDisease_validation_annotations.json
 ```
 
-辅助脚本：
+而本项目训练用的是 `torchvision.datasets.ImageFolder`，需要 `train/<class_id>/*.jpg` 这种按类目分文件夹的结构。所以**先归类、再（可选）清洗、最后训练**：
+
+### 1. 按 JSON 标注归类
 
 ```bash
-uv run python -m plant_disease.data.dataset_classifier   # 按 JSON 标注归类
-uv run python -m plant_disease.data.data_clean --train ... --val ...
+plant-disease prepare-data \
+    --images      AgriculturalDisease_trainingset/images \
+    --annotations AgriculturalDisease_trainingset/AgriculturalDisease_train_annotations.json \
+    --out         input/train \
+    --mode        copy        # 默认 copy 保留原数据；--mode move 直接迁移
+
+plant-disease prepare-data \
+    --images      AgriculturalDisease_validationset/images \
+    --annotations AgriculturalDisease_validationset/AgriculturalDisease_validation_annotations.json \
+    --out         input/val \
+    --mode        copy
 ```
+
+跑完后 `input/{train,val}/<0..60>/*.jpg` 就齐了。
+
+### 2. 数据清洗（可选）
+
+```bash
+plant-disease clean-data --train input/train --val input/val
+```
+
+清洗内容：
+- 删除文件名带「副本」的重复图片（来源于人工拷贝时的命名痕迹）
+- 删除 train 与 val 出现的同名图片，避免数据泄漏
+
+> 注意 `clean-data` 是**破坏性**的，会直接 `os.remove`。建议在 `--mode copy` 之后跑，方便回滚。
 
 ## 训练
 
