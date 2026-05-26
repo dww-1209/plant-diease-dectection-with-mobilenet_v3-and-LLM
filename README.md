@@ -1,17 +1,117 @@
-# plant-diease-dectection-with-mobilenet_v3-and-LLM
-根据百度2018年AI竞赛提供的数万张植物疾病农作物病害图像进行分类，采用轻量的mobile_net_v3作为迁移学习的对象，在此基础上训练并优化模型，最后结合调用大语言模型的api从而进行简单的网页部署.对植物的疾病监测及预防，诊断起到帮助
+# 植物病害识别（MobileNetV2 + LLM）
 
-预先从 https://link.zhihu.com/?target=https%3A//challenger.ai/competition/pdr2018 下载需要的数据集，由于设备所限制，采取约四万张图片作为数据集，其中训练图像总数为31718张，验证图像总数为4540张，
+基于 [百度 2018 AI 植物病害竞赛数据集](https://challenger.ai/competition/pdr2018) 训练 MobileNetV2 多分类模型，结合大语言模型（OpenAI / 百度文心 / 阿里通义）生成针对性治理建议。
 
-为了实验方便，这里定义了5个输出，第一个输出为原始的类别输出(61类)，第二个输出为植物类别(10类)，第三个输出为是否健康(2类)，第四个输出为病变程度(4种)，第五个输出为病害类型(27+1=28类)，这里就需要对标签进行映射，举个例子，类别0为苹果健康，则其对应的细分映射应该是 0 -> 0 0 0 0 具体的映射表见actual_classed_v2.txt
+## 架构
 
-通过运行data_clean 与 data_classifier 对数据集做清洗与分类，去除其中的部分错误数据，并将数据按照类别重新划分.
+```mermaid
+flowchart LR
+    User([浏览器]) -- "上传图片" --> Flask
+    Flask -- "图片字节" --> Inference[MobileNetV2 推理]
+    Inference -- "植物 / 病害 / 程度" --> Flask
+    Flask -- "POST /get_treatment_advice" --> LLM[LLM Provider]
+    LLM -- "治理建议" --> Flask
+    Flask -- "JSON" --> User
+```
 
-运行train.py 对模型进行训练，并通过后续微调来增加模型的准确率，最终得到一个表现最佳的模型，保存其参数
+## 快速开始
 
-接下来是两种部署方式。
-运行predict.py可以得到一个简单粗劣的交互页面，用户可以与其交互，上传图片，程序将返回该农作物是否患病，患病程度。患何疾病
+```bash
+git clone <your-repo>
+cd plant-disease-detection
+cp .env.example .env       # 按需填写 API Key
+uv sync                    # 安装依赖
+uv run plant-disease serve # http://localhost:5000
+```
 
-通过运行app.py，将其部署到网页端，交互页面也更加复杂多样，同时调用LLM的api，当模型返回对应类别时，大模型会给出相应的防治建议.
+> 推理需要权重文件 `resources/mobilenetv2_best.pth`（不入仓库）。无权重时 Web 可启动，但 `/predict` 会返回 503。
 
-本人在该项目中主要负责寻找数据集，数据清洗，数据分类。制作详细映射表以及模型的训练
+## 数据准备
+
+```
+input/
+├── train/<class_id>/*.jpg   # 0..60 共 61 个目录
+└── val/<class_id>/*.jpg
+```
+
+辅助脚本：
+
+```bash
+uv run python -m plant_disease.data.dataset_classifier   # 按 JSON 标注归类
+uv run python -m plant_disease.data.data_clean --train ... --val ...
+```
+
+## 训练
+
+```bash
+uv sync --extra train      # 装 matplotlib / scikit-learn / opencv-python
+uv run plant-disease train --data-dir input --epochs 20 --batch-size 64
+```
+
+产物：`mobilenetv2_best.pth`、`artifacts/loss.png`、`artifacts/accuracy.png`。
+
+## Web 部署
+
+```bash
+FLASK_DEBUG=0 PORT=8000 uv run plant-disease serve
+```
+
+| 路由 | 方法 | 说明 |
+|---|---|---|
+| `/` | GET | 首页 |
+| `/identify` | GET | 上传 + 识别页面 |
+| `/nav` | GET | 关于页 |
+| `/predict` | POST | `multipart/form-data`，字段 `image` |
+| `/get_treatment_advice` | POST | JSON `{plant_class, disease_name, disease_degree, health_status, provider?}` |
+
+## LLM 配置
+
+| Provider | 必需环境变量 |
+|---|---|
+| `mock` | 无（用于离线测试） |
+| `openai` | `OPENAI_API_KEY` |
+| `baidu` | `BAIDU_API_KEY`、`BAIDU_SECRET_KEY` |
+| `alibaba`（推荐） | `DASHSCOPE_API_KEY` |
+
+通过 `LLM_PROVIDER` 默认值选择，单次请求可在 body 里覆盖 `provider`。
+
+## 项目结构
+
+```
+src/plant_disease/
+├── cli.py            # `plant-disease serve | train`
+├── config.py         # Settings
+├── errors.py         # 自定义异常
+├── model.py          # InferenceModel (MobileNetV2)
+├── data/             # class_map / dataset_classifier / data_clean
+├── llm/              # base + mock/openai/baidu/alibaba + factory
+├── training/train.py # 训练流程
+└── web/              # Flask app factory + routes
+templates/  static/   # 前端
+tests/                # pytest
+resources/            # actual_classed_v2.txt + (.pth 不入仓库)
+```
+
+## 开发
+
+```bash
+uv sync --all-extras
+uv run pytest                # 跑全部测试
+uv run ruff check .          # lint
+uv run black .               # 格式化
+```
+
+## 常见问题
+
+**Q：没有 `.pth` 权重怎么办？**
+A：Web 仍可启动，识别接口会返回 503；可先用 `mock` provider 体验 LLM 接口，等训练或拷贝权重后再使用完整功能。
+
+**Q：为什么是 MobileNetV2 而不是仓库名所写的 V3？**
+A：原仓库代码实际就是 V2，本次重构选择对齐到代码现状，避免误导。后续若升级 V3 是独立 PR。
+
+**Q：Mac 没有 CUDA 能跑吗？**
+A：能。`InferenceModel` 自动选择 `cuda → mps → cpu`。
+
+## License
+
+MIT
