@@ -7,8 +7,10 @@
 打开浏览器访问 http://localhost:5000
 
 【环境变量】
-    HOST, PORT, FLASK_DEBUG, LLM_PROVIDER, DASHSCOPE_API_KEY, ...
-    复制 .env.example 为 .env 并按需填写即可。
+    .env 里只放 LLM key（OPENAI_API_KEY / DEEPSEEK_API_KEY / DASHSCOPE_API_KEY /
+    ZHIPU_API_KEY，任填一个就能用真实 LLM；都不填会自动落到 mock）。
+    HOST / PORT / FLASK_DEBUG / LLM_PROVIDER 等非敏感配置的默认值在
+    src/plant_disease/config.py 里，需要覆盖时再加到 .env。
 """
 
 from __future__ import annotations

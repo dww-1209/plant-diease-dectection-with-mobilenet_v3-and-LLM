@@ -11,9 +11,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import Iterator
 
-from flask import Blueprint, Flask, current_app, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    Flask,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+)
 
 from plant_disease.errors import InferenceError, LLMConfigError, LLMServiceError
 from plant_disease.llm.base import LLMService
@@ -92,9 +103,40 @@ def _resolve_provider(provider_name: str) -> LLMService:
     return service
 
 
+def _wants_sse() -> bool:
+    """Accept header 含 ``text/event-stream`` 即视为请求 SSE。"""
+    accept = request.headers.get("Accept", "")
+    return "text/event-stream" in accept
+
+
+def _sse_pack(event: str, data: str) -> str:
+    """打包成一个 SSE 事件帧。``data`` 用 JSON 编码以避免换行/特殊字符破坏协议。"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _stream_advice(service: LLMService, **kwargs: str) -> Iterator[str]:
+    """把 provider 的 chunk 流翻译成 SSE 字节流。
+
+    错误用 ``event: error``，正常结束发 ``event: done``——前端按事件名分发。
+    在 generator 内部 except，避免异常冒到 Flask 后被吞成 500（此时 headers
+    已经发出去了，没法再切回 JSON 错误）。
+    """
+    try:
+        for chunk in service.stream_treatment_advice(**kwargs):
+            yield _sse_pack("chunk", chunk)
+        yield _sse_pack("done", "")
+    except LLMServiceError as exc:
+        logger.exception("llm streaming failed")
+        yield _sse_pack("error", str(exc))
+
+
 @bp.route("/get_treatment_advice", methods=["POST"])
 def get_treatment_advice():
-    """LLM 治理建议接口。
+    """LLM 治理建议接口。两种返回模式：
+
+    * ``Accept: text/event-stream`` → SSE 流，事件名 ``chunk`` / ``done`` /
+      ``error``；data 是 JSON 字符串。
+    * 其他 → 一次性 JSON ``{"success": true, "advice": "..."}``。
 
     Body: ``application/json``::
 
@@ -103,12 +145,11 @@ def get_treatment_advice():
             "disease_name": "早疫病",
             "disease_degree": "一般",
             "health_status": "患病",
-            "provider": "alibaba"   // 可选；不传则用 settings.llm_provider
+            "provider": "openai"   // 可选；不传则用 settings.llm_provider
         }
 
-    Response: ``{"success": true, "advice": "..."}`` 或失败时 ``message`` + 状态码。
-
-    错误：400 缺字段 / 不支持的 provider / 缺 key；502 上游 LLM 失败。
+    错误：400 缺字段 / 不支持的 provider / 缺 key；502 上游 LLM 失败（仅
+    JSON 模式；SSE 模式下错误以 ``event: error`` 帧返回，HTTP 仍是 200）。
     """
     data = request.get_json(silent=True) or {}
     plant_class = data.get("plant_class", "")
@@ -123,20 +164,30 @@ def get_treatment_advice():
         )
 
     settings = current_app.config["SETTINGS"]
-    provider_name = (data.get("provider") or settings.llm_provider or "mock").strip().lower()
+    provider_name = (data.get("provider") or settings.llm_provider or "auto").strip().lower()
 
     try:
         service = _resolve_provider(provider_name)
     except LLMConfigError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
 
-    try:
-        advice = service.get_treatment_advice(
-            plant_class=plant_class,
-            disease_name=disease_name,
-            disease_degree=disease_degree,
-            health_status=health_status,
+    kwargs = {
+        "plant_class": plant_class,
+        "disease_name": disease_name,
+        "disease_degree": disease_degree,
+        "health_status": health_status,
+    }
+
+    if _wants_sse():
+        # 关掉代理缓冲（X-Accel-Buffering: no），防 nginx 等中间层把 chunk 攒成块。
+        return Response(
+            stream_with_context(_stream_advice(service, **kwargs)),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    try:
+        advice = service.get_treatment_advice(**kwargs)
         return jsonify({"success": True, "advice": advice})
     except LLMServiceError as exc:
         logger.exception("llm call failed")

@@ -1,6 +1,6 @@
 # 植物病害识别（MobileNetV2 + LLM）
 
-基于 [百度 2018 AI 植物病害竞赛数据集](https://challenger.ai/competition/pdr2018) 训练 MobileNetV2 多分类模型，结合大语言模型（OpenAI / 百度文心 / 阿里通义）生成针对性治理建议。
+基于 [百度 2018 AI 植物病害竞赛数据集](https://challenger.ai/competition/pdr2018) 训练 MobileNetV2 多分类模型，结合大语言模型（OpenAI / DeepSeek / 通义千问 / 智谱 GLM）流式生成针对性治理建议。
 
 ## 架构
 
@@ -110,16 +110,23 @@ uv run python run_web.py
 
 ## LLM 配置
 
-在 `.env` 文件里配置：
+所有真实 provider 都走 OpenAI 协议（用官方 `openai` SDK + 各家自己的 `base_url`），原生支持流式输出。
 
-| Provider | 必需环境变量 |
-|---|---|
-| `mock` | 无（默认值；用于离线测试） |
-| `openai` | `OPENAI_API_KEY` |
-| `baidu` | `BAIDU_API_KEY`、`BAIDU_SECRET_KEY` |
-| `alibaba`（推荐） | `DASHSCOPE_API_KEY` |
+| Provider | 必需环境变量 | 默认模型 |
+|---|---|---|
+| `openai`（auto 优先） | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| `alibaba` | `DASHSCOPE_API_KEY` | `qwen-turbo` |
+| `zhipu` | `ZHIPU_API_KEY` | `glm-4-flash` |
+| `mock` | 无 | 不调真实 API |
 
-通过 `LLM_PROVIDER` 默认值选择，单次请求可在 body 里覆盖 `provider` 字段。
+只往 `.env` 里放 API key 即可，**配置项不进 `.env`**。`LLM_PROVIDER` 的默认值在 `src/plant_disease/config.py` 中：
+
+- `LLM_PROVIDER=auto`（默认）：按 `openai → deepseek → alibaba → zhipu` 顺序选第一个配了 key 的；都没配就落到 `mock`。
+- 想固定某家，把 `LLM_PROVIDER=deepseek` 这种行写到自己机器的 `.env` 里。
+- 单次请求也可在 body 里加 `"provider": "openai"` 临时覆盖。
+
+`/get_treatment_advice` 同时支持两种返回模式：浏览器默认带 `Accept: text/event-stream` 走流式 SSE 渲染；其他客户端按原 JSON 一次性返回。
 
 ## 项目结构
 
@@ -138,7 +145,7 @@ plant-disease-detection/
 │   ├── errors.py             # 自定义异常
 │   ├── model.py              # InferenceModel
 │   ├── data/                 # class_map / dataset_classifier / data_clean
-│   ├── llm/                  # base + mock / openai / baidu / alibaba + factory
+│   ├── llm/                  # base + mock + openai_compatible + factory
 │   ├── training/train.py     # 训练流程
 │   └── web/
 │       ├── app.py            # Flask app factory
@@ -152,7 +159,7 @@ plant-disease-detection/
 
 ```bash
 uv sync --all-extras
-uv run pytest                # 跑全部测试（约 1 秒、47 项）
+uv run pytest                # 跑全部测试（约 1 秒、53 项）
 uv run ruff check .          # lint
 uv run black .               # 格式化
 ```

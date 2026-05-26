@@ -92,8 +92,9 @@ def test_predict_success_path(settings):
 
 
 class _BadProvider(MockProvider):
-    def get_treatment_advice(self, *args, **kwargs):
+    def stream_treatment_advice(self, *args, **kwargs):
         raise LLMServiceError("upstream down")
+        yield  # pragma: no cover - keep generator semantics
 
 
 def test_get_treatment_advice_returns_502_on_service_error(settings):
@@ -114,6 +115,26 @@ def test_get_treatment_advice_returns_502_on_service_error(settings):
     )
     assert resp.status_code == 502
     assert "upstream down" in resp.get_json()["message"]
+
+
+def test_get_treatment_advice_sse_stream(client):
+    resp = client.post(
+        "/get_treatment_advice",
+        json={
+            "plant_class": "番茄",
+            "disease_name": "早疫病",
+            "disease_degree": "一般",
+            "health_status": "患病",
+            "provider": "mock",
+        },
+        headers={"Accept": "text/event-stream"},
+    )
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/event-stream"
+    body = resp.get_data(as_text=True)
+    assert "event: chunk" in body
+    assert "event: done" in body
+    assert "番茄" in body
 
 
 def test_predict_rejects_oversized_upload():

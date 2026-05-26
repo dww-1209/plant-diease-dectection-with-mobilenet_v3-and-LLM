@@ -116,15 +116,42 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+// 解析 SSE 帧。SSE 一帧由若干 "field: value\n" 行组成，帧之间以空行分隔。
+// 这里只关心 event 和 data 两个字段。
+function parseSseFrame(raw) {
+  let event = "message";
+  const dataLines = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  // 后端 data 是 JSON 字符串（_sse_pack 用 json.dumps 编码）
+  const dataRaw = dataLines.join("\n");
+  let data = "";
+  try {
+    data = dataRaw ? JSON.parse(dataRaw) : "";
+  } catch {
+    data = dataRaw;
+  }
+  return { event, data };
+}
+
 adviceBtn.addEventListener("click", async () => {
   if (!lastResult) return;
   clearError();
   adviceBtn.disabled = true;
   adviceBtn.textContent = "生成中…";
+  const adviceTextEl = document.getElementById("advice-text");
+  adviceTextEl.textContent = "";
+  adviceCard.hidden = false;
+
   try {
     const resp = await fetch("/get_treatment_advice", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
       body: JSON.stringify({
         plant_class: lastResult.plant_class,
         disease_name: lastResult.disease_name,
@@ -132,11 +159,42 @@ adviceBtn.addEventListener("click", async () => {
         health_status: lastResult.health_status,
       }),
     });
-    const data = await resp.json();
-    if (!data.success) return showError(data.message || "获取建议失败");
-    document.getElementById("advice-text").textContent = data.advice;
-    adviceCard.hidden = false;
+
+    // 上游已经在响应头里返回 4xx（缺 key / 缺字段），按 JSON 错误处理
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      adviceCard.hidden = true;
+      return showError(data.message || `请求失败（HTTP ${resp.status}）`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let streamErr = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sep;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        if (!frame.trim()) continue;
+        const { event, data } = parseSseFrame(frame);
+        if (event === "chunk") adviceTextEl.textContent += data;
+        else if (event === "error") streamErr = data;
+        // event === "done" → 自然结束
+      }
+    }
+
+    if (streamErr) {
+      adviceCard.hidden = true;
+      showError(streamErr);
+    }
   } catch (err) {
+    adviceCard.hidden = true;
     showError("网络错误：" + err.message);
   } finally {
     adviceBtn.disabled = false;
