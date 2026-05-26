@@ -5,11 +5,11 @@
   <div class="card">
     <h2>上传图片</h2>
     <form id="upload-form">
-      <label class="dropzone" id="dropzone">
-        <input type="file" id="image-input" name="image" accept="image/*" hidden />
-        <span class="dropzone-hint">点击选择 / 拖拽图片到这里</span>
-      </label>
-      <img id="preview" alt="" />
+      <input type="file" id="image-input" name="image" accept="image/*" hidden />
+      <div class="dropzone" id="dropzone" role="button" tabindex="0">
+        <span class="dropzone-hint" id="dropzone-hint">点击选择 / 拖拽图片到这里</span>
+        <img id="preview" alt="预览图" />
+      </div>
       <button type="submit" class="btn" id="submit-btn">识别</button>
     </form>
   </div>
