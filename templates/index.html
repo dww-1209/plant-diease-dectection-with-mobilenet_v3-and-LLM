@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}识别 · 植物病害识别{% endblock %}
+{% block content %}
+<section class="identify">
+  <div class="card">
+    <h2>上传图片</h2>
+    <form id="upload-form">
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="image-input" name="image" accept="image/*" hidden />
+        <span class="dropzone-hint">点击选择 / 拖拽图片到这里</span>
+      </label>
+      <img id="preview" alt="" />
+      <button type="submit" class="btn" id="submit-btn">识别</button>
+    </form>
+  </div>
+
+  <div class="card" id="result-card" hidden>
+    <h2>识别结果</h2>
+    <dl class="result">
+      <dt>植物种类</dt><dd id="r-plant"></dd>
+      <dt>健康状况</dt><dd id="r-health"></dd>
+      <dt>病害名称</dt><dd id="r-disease"></dd>
+      <dt>患病程度</dt><dd id="r-degree"></dd>
+      <dt>置信度</dt><dd id="r-prob"></dd>
+    </dl>
+    <button id="advice-btn" class="btn secondary">获取治理建议</button>
+  </div>
+
+  <div class="card" id="advice-card" hidden>
+    <h2>治理建议</h2>
+    <pre id="advice-text"></pre>
+  </div>
+
+  <div class="error" id="error-box" hidden></div>
+</section>
+<script src="{{ url_for('static', filename='js/identify.js') }}"></script>
+{% endblock %}

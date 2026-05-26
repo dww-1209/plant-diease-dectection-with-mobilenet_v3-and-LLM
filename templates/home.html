@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>识别植物病害，给出治理建议</h1>
+  <p class="lead">上传一张作物叶片照片，模型会识别植物种类、健康状况与可能的病害；接着由大语言模型生成针对性的防治方案。</p>
+  <a class="btn" href="{{ url_for('plant_disease.identify') }}">开始识别</a>
+</section>
+
+<section class="features">
+  <article class="feature">
+    <h3>10 种植物 / 28 种病害</h3>
+    <p>覆盖苹果、樱桃、玉米、葡萄、柑桔、桃、辣椒、马铃薯、草莓、番茄。</p>
+  </article>
+  <article class="feature">
+    <h3>轻量化推理</h3>
+    <p>MobileNetV2 + 微调头，CPU/GPU/Apple Silicon 自动适配。</p>
+  </article>
+  <article class="feature">
+    <h3>多 LLM 后端</h3>
+    <p>OpenAI / 百度文心 / 阿里通义 任选其一，或使用本地 Mock。</p>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}关于 · 植物病害识别{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>关于本项目</h1>
+  <p>本项目以百度 2018 AI 竞赛的植物病害数据集训练 MobileNetV2 多分类模型，结合大语言模型（LLM）生成针对性的治理建议。</p>
+  <h2>功能流程</h2>
+  <ol>
+    <li>上传作物叶片照片</li>
+    <li>模型推理 → 植物种类 / 健康状况 / 病害类型 / 患病程度</li>
+    <li>调用 LLM → 生成防治方案</li>
+  </ol>
+  <h2>支持的 LLM 提供商</h2>
+  <ul>
+    <li>OpenAI（gpt-3.5-turbo 等）</li>
+    <li>百度文心一言</li>
+    <li>阿里通义千问（推荐，DashScope）</li>
+    <li>Mock（本地测试，无需 API Key）</li>
+  </ul>
+</section>
+{% endblock %}
