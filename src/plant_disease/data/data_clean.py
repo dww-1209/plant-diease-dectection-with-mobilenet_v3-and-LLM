@@ -1,8 +1,5 @@
-#coding=utf-8
-###############################################
-# 训练数据去重，删除标签模糊的训练数据
-# 2018.10.11 add
-###############################################
+"""Deduplicate training images and drop ambiguously labelled samples."""
+
 import logging
 import os
 from collections import Counter
