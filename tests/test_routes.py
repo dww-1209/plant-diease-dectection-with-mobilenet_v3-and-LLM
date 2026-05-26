@@ -1,4 +1,10 @@
 from io import BytesIO
+from pathlib import Path
+
+from plant_disease.config import Settings
+from plant_disease.errors import LLMServiceError
+from plant_disease.llm.mock_provider import MockProvider
+from plant_disease.web.app import create_app
 
 
 def test_get_treatment_advice_with_mock(client):
@@ -53,3 +59,80 @@ def test_get_treatment_advice_invalid_provider(client):
         },
     )
     assert resp.status_code == 400
+
+
+class _FakeModel:
+    def predict(self, _bytes):
+        return {
+            "class_id": 0,
+            "probability": 0.9,
+            "plant_class": "番茄",
+            "health_status": "患病",
+            "disease_name": "番茄早疫病",
+            "disease_degree": "一般",
+        }
+
+
+def test_predict_success_path(settings):
+    app = create_app(settings)
+    app.config["INFERENCE_MODEL"] = _FakeModel()
+    app.config["INIT_ERROR"] = None
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    resp = client.post(
+        "/predict",
+        data={"image": (BytesIO(b"x"), "x.png")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["data"]["plant_class"] == "番茄"
+
+
+class _BadProvider(MockProvider):
+    def get_treatment_advice(self, *args, **kwargs):
+        raise LLMServiceError("upstream down")
+
+
+def test_get_treatment_advice_returns_502_on_service_error(settings):
+    app = create_app(settings)
+    app.config["LLM_PROVIDERS"] = {"mock": _BadProvider()}
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    resp = client.post(
+        "/get_treatment_advice",
+        json={
+            "plant_class": "番茄",
+            "disease_name": "早疫病",
+            "disease_degree": "一般",
+            "health_status": "患病",
+            "provider": "mock",
+        },
+    )
+    assert resp.status_code == 502
+    assert "upstream down" in resp.get_json()["message"]
+
+
+def test_predict_rejects_oversized_upload():
+    settings = Settings(
+        weights_path=Path("missing.pth"),
+        classes_txt=Path("missing.txt"),
+        llm_provider="mock",
+    )
+    app = create_app(settings)
+    app.config["INFERENCE_MODEL"] = _FakeModel()
+    app.config["INIT_ERROR"] = None
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    big = b"\x00" * (11 * 1024 * 1024)
+    resp = client.post(
+        "/predict",
+        data={"image": (BytesIO(big), "big.bin")},
+        content_type="multipart/form-data",
+    )
+    # Flask returns 413 when MAX_CONTENT_LENGTH is exceeded.
+    assert resp.status_code == 413
