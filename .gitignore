@@ -26,8 +26,10 @@ resources/*.pth
 .vscode/
 .idea/
 
-# Training artefact PNGs (root + artifacts/) — keep static/ and docs/ assets
+# Training artefact PNGs (root + artifacts/) — keep static/ assets
 /*.png
 artifacts/*.png
-!docs/**/*.png
 !static/**/*.png
+
+# Internal planning / spec notes — local-only, not for the repo
+docs/
