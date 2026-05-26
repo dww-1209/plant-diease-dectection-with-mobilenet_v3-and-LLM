@@ -15,14 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings) -> Flask:
-    app = Flask(
-        __name__,
-        template_folder="../../../templates",
-        static_folder="../../../static",
-    )
+    app = Flask(__name__)
     app.config["SETTINGS"] = settings
     app.config["INIT_ERROR"] = None
     app.config["INFERENCE_MODEL"] = None
+    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
     try:
         app.config["INFERENCE_MODEL"] = InferenceModel(
@@ -30,7 +27,7 @@ def create_app(settings: Settings) -> Flask:
             classes_txt=settings.classes_txt,
         )
     except InferenceError as exc:
-        logger.warning("inference model failed to initialize: %s", exc)
+        logger.exception("inference model failed to initialize")
         app.config["INIT_ERROR"] = str(exc)
 
     register_routes(app)
