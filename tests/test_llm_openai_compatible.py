@@ -34,6 +34,10 @@ def test_stream_yields_concatenable_chunks():
     kwargs = fake_create.call_args.kwargs
     assert kwargs["stream"] is True
     assert kwargs["model"] == "test-model"
+    # 必须是 system + user 两条消息
+    messages = kwargs["messages"]
+    assert [m["role"] for m in messages] == ["system", "user"]
+    assert "番茄" in messages[1]["content"] and "早疫病" in messages[1]["content"]
 
 
 def test_stream_skips_chunks_without_choices():

@@ -4,7 +4,7 @@ import pytest
 
 from plant_disease.config import Settings
 from plant_disease.errors import LLMConfigError
-from plant_disease.llm.factory import PROVIDERS, get_llm_service
+from plant_disease.llm.factory import PROVIDERS, build_one_off, get_llm_service
 from plant_disease.llm.mock_provider import MockProvider
 from plant_disease.llm.openai_compatible import OpenAICompatibleProvider
 
@@ -45,7 +45,7 @@ def test_factory_explicit_provider_with_key_returns_compatible(monkeypatch):
     service = get_llm_service("deepseek", _settings())
     assert isinstance(service, OpenAICompatibleProvider)
     assert service.label == "deepseek"
-    assert service.model == PROVIDERS["deepseek"].model
+    assert service.model == PROVIDERS["deepseek"].default_model
 
 
 def test_auto_falls_back_to_mock_when_no_keys():
@@ -68,3 +68,31 @@ def test_auto_picks_first_configured_in_priority_order(monkeypatch):
     service = get_llm_service("auto", _settings())
     assert isinstance(service, OpenAICompatibleProvider)
     assert service.label == "deepseek"
+
+
+def test_build_one_off_uses_supplied_key_and_model():
+    # build_one_off 不读环境变量，key/model 全靠调用方传
+    service = build_one_off("openai", "sk-user-key", "gpt-5.4-mini")
+    assert isinstance(service, OpenAICompatibleProvider)
+    assert service.label == "openai"
+    assert service.model == "gpt-5.4-mini"
+
+
+def test_build_one_off_falls_back_to_default_model():
+    service = build_one_off("zhipu", "sk-user", "")
+    assert isinstance(service, OpenAICompatibleProvider)
+    assert service.model == PROVIDERS["zhipu"].default_model
+
+
+def test_build_one_off_mock_works_without_key():
+    assert isinstance(build_one_off("mock", "", ""), MockProvider)
+
+
+def test_build_one_off_requires_key_for_real_provider():
+    with pytest.raises(LLMConfigError):
+        build_one_off("openai", "", "gpt-5.5")
+
+
+def test_build_one_off_rejects_unknown_provider():
+    with pytest.raises(LLMConfigError):
+        build_one_off("nope", "k", "m")

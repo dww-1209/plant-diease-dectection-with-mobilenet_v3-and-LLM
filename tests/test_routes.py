@@ -137,6 +137,50 @@ def test_get_treatment_advice_sse_stream(client):
     assert "番茄" in body
 
 
+def test_list_llm_providers(client):
+    resp = client.get("/api/llm/providers")
+    assert resp.status_code == 200
+    payload = resp.get_json()["providers"]
+    assert "openai" in payload and "deepseek" in payload
+    assert "mock" in payload
+    # 每家都有 default 和非空 models
+    for spec in payload.values():
+        assert spec["default"]
+        assert isinstance(spec["models"], list) and spec["models"]
+
+
+def test_advice_with_user_supplied_key_uses_one_off(settings, monkeypatch):
+    """传 api_key 时走 build_one_off，且 service 不被进程缓存。"""
+    app = create_app(settings)
+    app.config["TESTING"] = True
+    captured = {}
+
+    def fake_one_off(provider, api_key, model):
+        captured["provider"] = provider
+        captured["api_key"] = api_key
+        captured["model"] = model
+        return MockProvider()
+
+    monkeypatch.setattr("plant_disease.web.routes.build_one_off", fake_one_off)
+    client = app.test_client()
+    resp = client.post(
+        "/get_treatment_advice",
+        json={
+            "plant_class": "番茄",
+            "disease_name": "早疫病",
+            "disease_degree": "一般",
+            "health_status": "患病",
+            "provider": "openai",
+            "api_key": "sk-user-key",
+            "model": "gpt-5.5",
+        },
+    )
+    assert resp.status_code == 200
+    assert captured == {"provider": "openai", "api_key": "sk-user-key", "model": "gpt-5.5"}
+    # 不缓存：app.config["LLM_PROVIDERS"] 不应被一次性请求污染
+    assert "openai" not in app.config.get("LLM_PROVIDERS", {})
+
+
 def test_predict_rejects_oversized_upload():
     settings = Settings(
         weights_path=Path("missing.pth"),

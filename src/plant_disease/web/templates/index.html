@@ -14,6 +14,23 @@
     </form>
   </div>
 
+  <details class="card llm-settings" id="llm-settings">
+    <summary>LLM 设置（可选）</summary>
+    <p class="hint">不填则用服务器环境变量配置的 provider；填了则按本次请求覆盖，key 仅保存在本浏览器（sessionStorage），不会落到服务器日志。</p>
+    <div class="form-grid">
+      <label>提供商
+        <select id="llm-provider"></select>
+      </label>
+      <label>API Key
+        <input type="password" id="llm-api-key" autocomplete="off" placeholder="sk-... / 各家 console 拿到的 key" />
+      </label>
+      <label>模型
+        <input type="text" id="llm-model" list="llm-model-list" placeholder="选择或手填" />
+        <datalist id="llm-model-list"></datalist>
+      </label>
+    </div>
+  </details>
+
   <div class="card" id="result-card" hidden>
     <h2>识别结果</h2>
     <dl class="result">

@@ -8,9 +8,79 @@ const resultCard = document.getElementById("result-card");
 const adviceCard = document.getElementById("advice-card");
 const errorBox = document.getElementById("error-box");
 const adviceBtn = document.getElementById("advice-btn");
+const providerSel = document.getElementById("llm-provider");
+const apiKeyInput = document.getElementById("llm-api-key");
+const modelInput = document.getElementById("llm-model");
+const modelList = document.getElementById("llm-model-list");
 
 let lastResult = null;
 let currentObjectURL = null;
+let providersCatalog = {};
+
+// 拉 provider/model 清单填到下拉框 + datalist。失败不阻塞核心流程，
+// 用户可以手填模型 ID。
+async function loadProviders() {
+  try {
+    const resp = await fetch("/api/llm/providers");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    providersCatalog = data.providers || {};
+    providerSel.innerHTML = "";
+    const auto = document.createElement("option");
+    auto.value = "";
+    auto.textContent = "（用服务器默认）";
+    providerSel.appendChild(auto);
+    for (const name of Object.keys(providersCatalog)) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      providerSel.appendChild(opt);
+    }
+    // sessionStorage 恢复（仅本标签页存活；关掉浏览器即清）
+    const saved = JSON.parse(sessionStorage.getItem("llmSettings") || "{}");
+    if (saved.provider) providerSel.value = saved.provider;
+    if (saved.apiKey) apiKeyInput.value = saved.apiKey;
+    if (saved.model) modelInput.value = saved.model;
+    refreshModelList();
+  } catch {
+    // 静默：保留输入框，让用户手填
+  }
+}
+
+function refreshModelList() {
+  const spec = providersCatalog[providerSel.value];
+  modelList.innerHTML = "";
+  if (!spec) return;
+  for (const m of spec.models) {
+    const opt = document.createElement("option");
+    opt.value = m;
+    modelList.appendChild(opt);
+  }
+  // 用户没手填且当前值不在新清单里，重置为该 provider 的默认
+  if (!modelInput.value || !spec.models.includes(modelInput.value)) {
+    modelInput.value = spec.default;
+  }
+}
+
+function persistLlmSettings() {
+  sessionStorage.setItem(
+    "llmSettings",
+    JSON.stringify({
+      provider: providerSel.value,
+      apiKey: apiKeyInput.value,
+      model: modelInput.value,
+    })
+  );
+}
+
+providerSel.addEventListener("change", () => {
+  refreshModelList();
+  persistLlmSettings();
+});
+apiKeyInput.addEventListener("input", persistLlmSettings);
+modelInput.addEventListener("input", persistLlmSettings);
+
+loadProviders();
 
 function showError(msg) {
   errorBox.textContent = msg;
@@ -157,6 +227,9 @@ adviceBtn.addEventListener("click", async () => {
         disease_name: lastResult.disease_name,
         disease_degree: lastResult.disease_degree,
         health_status: lastResult.health_status,
+        provider: providerSel.value || undefined,
+        api_key: apiKeyInput.value || undefined,
+        model: modelInput.value || undefined,
       }),
     });
 

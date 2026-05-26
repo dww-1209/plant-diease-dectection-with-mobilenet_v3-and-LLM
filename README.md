@@ -104,7 +104,8 @@ uv run python run_web.py
 | `/identify` | GET | 上传 + 识别页面 |
 | `/nav` | GET | 关于页 |
 | `/predict` | POST | `multipart/form-data`，字段 `image` |
-| `/get_treatment_advice` | POST | JSON `{plant_class, disease_name, disease_degree, health_status, provider?}` |
+| `/get_treatment_advice` | POST | JSON `{plant_class, disease_name, disease_degree, health_status, provider?, api_key?, model?}` |
+| `/api/llm/providers` | GET | 返回 provider/model 清单，前端用来填下拉框 + datalist |
 
 默认绑定 `127.0.0.1:5000`，通过 `.env` 里的 `HOST` / `PORT` / `FLASK_DEBUG` 调整。
 
@@ -112,19 +113,23 @@ uv run python run_web.py
 
 所有真实 provider 都走 OpenAI 协议（用官方 `openai` SDK + 各家自己的 `base_url`），原生支持流式输出。
 
-| Provider | 必需环境变量 | 默认模型 |
-|---|---|---|
-| `openai`（auto 优先） | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-chat` |
-| `alibaba` | `DASHSCOPE_API_KEY` | `qwen-turbo` |
-| `zhipu` | `ZHIPU_API_KEY` | `glm-4-flash` |
-| `mock` | 无 | 不调真实 API |
+| Provider | 必需环境变量 | 默认模型（截至 2026-05） | 候选清单 |
+|---|---|---|---|
+| `openai`（auto 优先） | `OPENAI_API_KEY` | `gpt-5.5` | `gpt-5.4` / `gpt-5.4-mini` / `gpt-5.4-nano` / `gpt-4o` |
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-v4-pro` | `deepseek-v4-flash` |
+| `alibaba` | `DASHSCOPE_API_KEY` | `qwen3.7-max` | `qwen3.6-plus` / `qwen3.6-flash` |
+| `zhipu` | `ZHIPU_API_KEY` | `glm-5.1` | `glm-5` / `glm-4.7` / `glm-4.7-flash` |
+| `mock` | 无 | 不调真实 API |  |
 
-只往 `.env` 里放 API key 即可，**配置项不进 `.env`**。`LLM_PROVIDER` 的默认值在 `src/plant_disease/config.py` 中：
+模型清单维护在 `src/plant_disease/llm/factory.py` 的 `PROVIDERS` 表里，前端 `/identify` 页面会通过 `/api/llm/providers` 拉这张表填到 `<datalist>`，**用户可以手填任意官方新发布的模型 ID**——官方今天发新版本，前端马上能用，不必等仓库改默认值。
 
-- `LLM_PROVIDER=auto`（默认）：按 `openai → deepseek → alibaba → zhipu` 顺序选第一个配了 key 的；都没配就落到 `mock`。
-- 想固定某家，把 `LLM_PROVIDER=deepseek` 这种行写到自己机器的 `.env` 里。
-- 单次请求也可在 body 里加 `"provider": "openai"` 临时覆盖。
+**Prompt 结构**（详见 `src/plant_disease/llm/base.py`）：把"角色/规范/输出格式"放在 `SYSTEM_PROMPT`（system 角色），每次请求里只塞病例字段到 user 消息。模型对 system 角色权重更高，专业语气和章节结构更稳。
+
+**配置 LLM 的三种方式（优先级从低到高）**：
+
+1. **服务器端 `.env`**：放 API key 到对应环境变量；可选 `LLM_PROVIDER=auto`（默认）按 `openai → deepseek → alibaba → zhipu` 顺序回退到第一个配了 key 的，都没有就落 `mock`。想固定某家就写 `LLM_PROVIDER=deepseek`。
+2. **每次请求覆盖 provider**：body 里加 `"provider": "openai"`。
+3. **Web 前端用户自带 key**：`/identify` 页面有「LLM 设置（可选）」面板，填 provider + API key + model 后下次请求就用这套。key 仅存在浏览器 sessionStorage（关掉标签页即清），后端走"一次性 provider"路径不缓存，避免不同用户的 key 互相污染。
 
 `/get_treatment_advice` 同时支持两种返回模式：浏览器默认带 `Accept: text/event-stream` 走流式 SSE 渲染；其他客户端按原 JSON 一次性返回。
 
@@ -159,7 +164,7 @@ plant-disease-detection/
 
 ```bash
 uv sync --all-extras
-uv run pytest                # 跑全部测试（约 1 秒、53 项）
+uv run pytest                # 跑全部测试（约 1 秒、61 项）
 uv run ruff check .          # lint
 uv run black .               # 格式化
 ```

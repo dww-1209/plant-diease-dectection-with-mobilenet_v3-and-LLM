@@ -47,11 +47,11 @@ class OpenAICompatibleProvider(LLMService):
         disease_degree: str,
         health_status: str,
     ) -> Iterator[str]:
-        prompt = self._build_prompt(plant_class, disease_name, disease_degree, health_status)
+        messages = self._build_messages(plant_class, disease_name, disease_degree, health_status)
         try:
             stream = self._client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=0.7,
                 stream=True,
             )

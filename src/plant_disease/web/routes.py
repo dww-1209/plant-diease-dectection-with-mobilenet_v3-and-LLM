@@ -28,7 +28,7 @@ from flask import (
 
 from plant_disease.errors import InferenceError, LLMConfigError, LLMServiceError
 from plant_disease.llm.base import LLMService
-from plant_disease.llm.factory import get_llm_service
+from plant_disease.llm.factory import PROVIDERS, build_one_off, get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -130,12 +130,27 @@ def _stream_advice(service: LLMService, **kwargs: str) -> Iterator[str]:
         yield _sse_pack("error", str(exc))
 
 
+@bp.route("/api/llm/providers", methods=["GET"])
+def list_llm_providers():
+    """前端用来填充 provider 下拉框 + 模型 datalist。
+
+    返回每家 provider 的推荐模型清单和默认模型；不返回任何 key。``mock`` 显式
+    列出，方便用户在 web 上切到调试模式。
+    """
+    payload = {
+        name: {"models": list(spec.models), "default": spec.default_model}
+        for name, spec in PROVIDERS.items()
+    }
+    payload["mock"] = {"models": ["mock"], "default": "mock"}
+    return jsonify({"providers": payload})
+
+
 @bp.route("/get_treatment_advice", methods=["POST"])
 def get_treatment_advice():
     """LLM 治理建议接口。两种返回模式：
 
-    * ``Accept: text/event-stream`` → SSE 流，事件名 ``chunk`` / ``done`` /
-      ``error``；data 是 JSON 字符串。
+    * ``Accept: text/event-stream`` → SSE 流,事件名 ``chunk`` / ``done`` /
+      ``error``;data 是 JSON 字符串。
     * 其他 → 一次性 JSON ``{"success": true, "advice": "..."}``。
 
     Body: ``application/json``::
@@ -145,11 +160,16 @@ def get_treatment_advice():
             "disease_name": "早疫病",
             "disease_degree": "一般",
             "health_status": "患病",
-            "provider": "openai"   // 可选；不传则用 settings.llm_provider
+            "provider": "openai",  // 可选;不传则用 settings.llm_provider
+            "api_key": "sk-...",   // 可选;用户在 web 上手填的 key
+            "model": "gpt-5.5"     // 可选;搭配 api_key 使用
         }
 
-    错误：400 缺字段 / 不支持的 provider / 缺 key；502 上游 LLM 失败（仅
-    JSON 模式；SSE 模式下错误以 ``event: error`` 帧返回，HTTP 仍是 200）。
+    ``api_key`` 传了就走"一次性 provider"路径(不缓存),避免不同用户的 key 互相
+    污染;没传则走环境变量 + 进程内缓存的老路径。
+
+    错误:400 缺字段 / 不支持的 provider / 缺 key;502 上游 LLM 失败(仅
+    JSON 模式;SSE 模式下错误以 ``event: error`` 帧返回,HTTP 仍是 200)。
     """
     data = request.get_json(silent=True) or {}
     plant_class = data.get("plant_class", "")
@@ -165,9 +185,15 @@ def get_treatment_advice():
 
     settings = current_app.config["SETTINGS"]
     provider_name = (data.get("provider") or settings.llm_provider or "auto").strip().lower()
+    api_key = (data.get("api_key") or "").strip()
+    model = (data.get("model") or "").strip()
 
     try:
-        service = _resolve_provider(provider_name)
+        if api_key or model:
+            # 用户在 web 上手填了 key/model：走 build_one_off，不缓存。
+            service = build_one_off(provider_name, api_key, model)
+        else:
+            service = _resolve_provider(provider_name)
     except LLMConfigError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
 
