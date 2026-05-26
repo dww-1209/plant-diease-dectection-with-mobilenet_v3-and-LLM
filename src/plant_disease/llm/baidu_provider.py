@@ -30,12 +30,19 @@ class BaiduWenxinProvider(LLMService):
         }
         try:
             resp = requests.post(TOKEN_URL, params=params, timeout=10)
+        except requests.RequestException as exc:
+            # Network failure → service-level (502), not config (400).
+            raise LLMServiceError(f"百度 access_token 请求失败：{exc}") from exc
+        # 4xx from Baidu's token endpoint signals invalid credentials.
+        if 400 <= resp.status_code < 500:
+            raise LLMConfigError(f"百度凭证无效（HTTP {resp.status_code}）：{resp.text[:200]}")
+        try:
             resp.raise_for_status()
             token = resp.json().get("access_token", "")
-        except requests.RequestException as exc:
-            raise LLMConfigError(f"获取百度 access_token 失败：{exc}") from exc
+        except (requests.HTTPError, ValueError) as exc:
+            raise LLMServiceError(f"百度 access_token 响应异常：{exc}") from exc
         if not token:
-            raise LLMConfigError("百度 access_token 响应为空")
+            raise LLMConfigError("百度 access_token 响应为空（凭证可能无效）")
         return token
 
     def _endpoint(self, prompt: str) -> tuple[str, dict[str, str], dict[str, Any]]:
