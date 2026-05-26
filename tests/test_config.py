@@ -15,6 +15,7 @@ def test_load_settings_defaults(monkeypatch):
         "WEIGHTS_PATH",
         "CLASSES_TXT",
         "FLASK_DEBUG",
+        "HOST",
         "PORT",
     ]:
         monkeypatch.delenv(key, raising=False)
@@ -23,6 +24,7 @@ def test_load_settings_defaults(monkeypatch):
     assert isinstance(s, Settings)
     assert s.llm_provider == "mock"
     assert s.flask_debug is False
+    assert s.host == "127.0.0.1"
     assert s.port == 5000
     assert s.weights_path == Path("resources/mobilenetv2_best.pth")
     assert s.classes_txt == Path("resources/actual_classed_v2.txt")

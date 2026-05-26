@@ -29,7 +29,8 @@ def _cmd_serve(_args: argparse.Namespace) -> int:
 
     settings = load_settings()
     app = create_app(settings)
-    app.run(host="0.0.0.0", port=settings.port, debug=settings.flask_debug)
+    # Flask's app.run is the bundled dev server — don't expose it as production.
+    app.run(host=settings.host, port=settings.port, debug=settings.flask_debug)
     return 0
 
 

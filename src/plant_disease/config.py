@@ -29,6 +29,7 @@ class Settings:
     baidu_api_key: str = ""
     baidu_secret_key: str = ""
     flask_debug: bool = False
+    host: str = "127.0.0.1"
     port: int = 5000
 
 
@@ -42,5 +43,6 @@ def load_settings() -> Settings:
         baidu_api_key=os.environ.get("BAIDU_API_KEY", ""),
         baidu_secret_key=os.environ.get("BAIDU_SECRET_KEY", ""),
         flask_debug=_bool_env("FLASK_DEBUG", False),
+        host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", "5000")),
     )
