@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtualenv / uv
+.venv/
+.uv/
+
+# Env
+.env
+
+# Model weights and data (too large for repo)
+*.pth
+*.pt
+input/
+resources/*.pth
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Outputs
+*.png
+!docs/**/*.png

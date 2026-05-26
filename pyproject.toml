@@ -1,0 +1,53 @@
+[project]
+name = "plant-disease"
+version = "0.1.0"
+description = "Plant disease detection with MobileNetV2 and LLM-based treatment advice."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=2.2.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "pillow>=9.0.0",
+    "numpy>=1.21.0",
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+train = [
+    "matplotlib>=3.7.0",
+    "scikit-learn>=1.2.0",
+    "opencv-python>=4.7.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+]
+
+[project.scripts]
+plant-disease = "plant_disease.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plant_disease"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
