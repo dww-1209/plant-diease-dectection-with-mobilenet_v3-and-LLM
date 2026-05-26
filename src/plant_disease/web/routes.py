@@ -3,19 +3,11 @@
 from __future__ import annotations
 
 import logging
-import os
 
-from flask import (
-    Blueprint,
-    Flask,
-    current_app,
-    jsonify,
-    render_template,
-    request,
-    send_from_directory,
-)
+from flask import Blueprint, Flask, current_app, jsonify, render_template, request
 
 from plant_disease.errors import InferenceError, LLMConfigError, LLMServiceError
+from plant_disease.llm.base import LLMService
 from plant_disease.llm.factory import get_llm_service
 
 logger = logging.getLogger(__name__)
@@ -36,13 +28,6 @@ def nav():
 @bp.route("/identify")
 def identify():
     return render_template("index.html")
-
-
-@bp.route("/images/<path:filename>")
-def serve_image(filename: str):
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(root_dir, "..", "..", ".."))
-    return send_from_directory(project_root, filename)
 
 
 @bp.route("/predict", methods=["POST"])
@@ -66,6 +51,17 @@ def predict():
         return jsonify({"success": False, "message": f"预测失败：{exc}"}), 500
 
 
+def _resolve_provider(provider_name: str) -> LLMService:
+    """Return a provider instance, cached per Flask app for the process lifetime."""
+    cache: dict[str, LLMService] = current_app.config.setdefault("LLM_PROVIDERS", {})
+    if provider_name in cache:
+        return cache[provider_name]
+    settings = current_app.config["SETTINGS"]
+    service = get_llm_service(provider_name, settings)
+    cache[provider_name] = service
+    return service
+
+
 @bp.route("/get_treatment_advice", methods=["POST"])
 def get_treatment_advice():
     data = request.get_json(silent=True) or {}
@@ -84,9 +80,7 @@ def get_treatment_advice():
     provider_name = (data.get("provider") or settings.llm_provider or "mock").strip().lower()
 
     try:
-        service = get_llm_service(provider_name)
-    except ValueError as exc:
-        return jsonify({"success": False, "message": str(exc)}), 400
+        service = _resolve_provider(provider_name)
     except LLMConfigError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
 
