@@ -26,6 +26,8 @@ resources/*.pth
 .vscode/
 .idea/
 
-# Outputs
-*.png
+# Training artefact PNGs (root + artifacts/) — keep static/ and docs/ assets
+/*.png
+artifacts/*.png
 !docs/**/*.png
+!static/**/*.png
